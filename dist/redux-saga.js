@@ -1310,14 +1310,14 @@ function matcher(pattern) {
   - If it completes, the return value is the one returned by the main task
 **/
 function forkQueue(name, mainTask, cb) {
-  var tasks = [],
-      result = void 0,
-      completed = false;
+  var tasks = [];
+  var result = void 0;
+  var completed = false;
   addTask(mainTask);
 
   function abort(err) {
     cancelAll();
-    cb(err, true);
+    return cb(err, true);
   }
 
   function addTask(task) {
@@ -1326,22 +1326,20 @@ function forkQueue(name, mainTask, cb) {
       if (completed) {
         return;
       }
-
       remove(tasks, task);
       task.cont = noop;
       if (isErr) {
-        abort(res);
+        return abort(res);
       } else {
         if (task === mainTask) {
           result = res;
         }
         if (!tasks.length) {
           completed = true;
-          cb(result);
+          return cb(result);
         }
       }
     };
-    // task.cont.cancel = task.cancel
   }
 
   function cancelAll() {
@@ -1351,7 +1349,7 @@ function forkQueue(name, mainTask, cb) {
     completed = true;
     tasks.forEach(function (t) {
       t.cont = noop;
-      t.cancel();
+      return t.cancel();
     });
     tasks = [];
   }
@@ -1464,7 +1462,7 @@ function proc(iterator) {
   function cancelMain() {
     if (mainTask.isRunning && !mainTask.isCancelled) {
       mainTask.isCancelled = true;
-      next(TASK_CANCEL);
+      return next(TASK_CANCEL);
     }
   }
 
@@ -1486,7 +1484,7 @@ function proc(iterator) {
       /**
         Ending with a Never result will propagate the Cancellation to all joiners
       **/
-      end(TASK_CANCEL);
+      return end(TASK_CANCEL);
     }
   }
   /**
@@ -1544,7 +1542,7 @@ function proc(iterator) {
       }
 
       if (!result.done) {
-        runEffect(result.value, parentEffectId, '', next);
+        return runEffect(result.value, parentEffectId, '', next);
       } else {
         /**
           This Generator has ended, terminate the main task and notify the fork queue
@@ -1557,7 +1555,7 @@ function proc(iterator) {
         log$$1('error', 'uncaught at ' + name, error.message);
       }
       mainTask.isMainRunning = false;
-      mainTask.cont(error, true);
+      return mainTask.cont(error, true);
     }
   }
 
@@ -1617,7 +1615,7 @@ function proc(iterator) {
       if (sagaMonitor) {
         isErr ? sagaMonitor.effectRejected(effectId, res) : sagaMonitor.effectResolved(effectId, res);
       }
-      cb(res, isErr);
+      return cb(res, isErr);
     }
     // tracks down the current cancel
     currCb.cancel = noop;
@@ -1679,13 +1677,13 @@ function proc(iterator) {
       // TODO: add support for the fetch API, whenever they get around to
       // adding cancel support
     }
-    promise.then(cb, function (error) {
+    return promise.then(cb, function (error) {
       return cb(error, true);
     });
   }
 
   function resolveIterator(iterator, effectId, name, cb) {
-    proc(iterator, subscribe, dispatch, getState, taskContext, options, effectId, name, cb);
+    return proc(iterator, subscribe, dispatch, getState, taskContext, options, effectId, name, cb);
   }
 
   function runTakeEffect(_ref2, cb) {
@@ -1715,7 +1713,7 @@ function proc(iterator) {
       The put will be executed atomically. ie nested puts will execute after
       this put has terminated.
     **/
-    asap(function () {
+    return asap(function () {
       var result = void 0;
       try {
         result = (channel$$1 ? channel$$1.put : dispatch)(action);
@@ -1726,7 +1724,7 @@ function proc(iterator) {
       }
 
       if (resolve && is.promise(result)) {
-        resolvePromise(result, cb);
+        return resolvePromise(result, cb);
       } else {
         return cb(result);
       }
@@ -1798,7 +1796,7 @@ function proc(iterator) {
         }
       }
     } finally {
-      flush();
+      return flush();
     }
     // Fork effects are non cancellables
   }
@@ -1809,9 +1807,9 @@ function proc(iterator) {
       cb.cancel = function () {
         return remove(t.joiners, joiner);
       };
-      t.joiners.push(joiner);
+      return t.joiners.push(joiner);
     } else {
-      t.isAborted() ? cb(t.error(), true) : cb(t.result());
+      return t.isAborted() ? cb(t.error(), true) : cb(t.result());
     }
   }
 
@@ -1822,7 +1820,7 @@ function proc(iterator) {
     if (taskToCancel.isRunning()) {
       taskToCancel.cancel();
     }
-    cb();
+    return cb();
     // cancel effects are non cancellables
   }
 
@@ -1841,7 +1839,7 @@ function proc(iterator) {
     function checkEffectEnd() {
       if (completedCount === keys.length) {
         completed = true;
-        cb(is.array(effects) ? array.from(_extends({}, results, { length: keys.length })) : results);
+        return cb(is.array(effects) ? array.from(_extends({}, results, { length: keys.length })) : results);
       }
     }
 
@@ -1866,13 +1864,13 @@ function proc(iterator) {
     cb.cancel = function () {
       if (!completed) {
         completed = true;
-        keys.forEach(function (key) {
+        return keys.forEach(function (key) {
           return childCbs[key].cancel();
         });
       }
     };
 
-    keys.forEach(function (key) {
+    return keys.forEach(function (key) {
       return runEffect(effects[key], effectId, key, childCbs[key]);
     });
   }
@@ -1908,7 +1906,7 @@ function proc(iterator) {
       // prevents unnecessary cancellation
       if (!completed) {
         completed = true;
-        keys.forEach(function (key) {
+        return keys.forEach(function (key) {
           return childCbs[key].cancel();
         });
       }
@@ -1917,7 +1915,7 @@ function proc(iterator) {
       if (completed) {
         return;
       }
-      runEffect(effects[key], effectId, key, childCbs[key]);
+      return runEffect(effects[key], effectId, key, childCbs[key]);
     });
   }
 
@@ -1927,9 +1925,9 @@ function proc(iterator) {
 
     try {
       var state = selector.apply(undefined, [getState()].concat(args));
-      cb(state);
+      return cb(state);
     } catch (error) {
-      cb(error, true);
+      return cb(error, true);
     }
   }
 
@@ -1939,24 +1937,24 @@ function proc(iterator) {
 
     var match = matcher(pattern);
     match.pattern = pattern;
-    cb(eventChannel(subscribe, buffer || buffers.fixed(), match));
+    return cb(eventChannel(subscribe, buffer || buffers.fixed(), match));
   }
 
   function runCancelledEffect(data, cb) {
-    cb(!!mainTask.isCancelled);
+    return cb(!!mainTask.isCancelled);
   }
 
   function runFlushEffect(channel$$1, cb) {
-    channel$$1.flush(cb);
+    return channel$$1.flush(cb);
   }
 
   function runGetContextEffect(prop, cb) {
-    cb(taskContext[prop]);
+    return cb(taskContext[prop]);
   }
 
   function runSetContextEffect(props, cb) {
     object.assign(taskContext, props);
-    cb();
+    return cb();
   }
 
   function newTask(id, name, iterator, cont) {
